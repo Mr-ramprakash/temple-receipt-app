@@ -1,0 +1,51 @@
+@import "tailwindcss";
+
+:root {
+  /* Prevent horizontal scroll and improve touch feel */
+  overflow-x: hidden;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #FFFBF0;
+  /* Prevent elastic scrolling/bounce on some mobile browsers */
+  overscroll-behavior-y: none;
+}
+
+/* Custom scrollbar for a clean look */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #ffedd5;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #fed7aa;
+}
+
+/* Prevent text selection on buttons for a native app feel */
+button {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Large input focus states */
+input:focus {
+  outline: none;
+}
+
+/* Ensure images don't drag */
+img {
+  user-select: none;
+  -webkit-user-drag: none;
+}
