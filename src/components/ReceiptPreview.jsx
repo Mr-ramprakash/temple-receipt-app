@@ -14,45 +14,87 @@ const ReceiptPreview = ({ formData, receiptNo, onReset }) => {
     day: 'numeric',
   });
 
-  // Action 1: Just Download PNG
-  const handleDownloadOnly = async () => {
-    if (!receiptRef.current) return;
-    
-    setIsGenerating(true);
+  const generateImageBlob = async () => {
+    if (!receiptRef.current) return null;
     try {
-      await new Promise(resolve => setTimeout(resolve, 400));
       const canvas = await html2canvas(receiptRef.current, {
         scale: 3,
         useCORS: true,
         backgroundColor: '#ffffff',
         logging: false,
       });
-
-      const image = canvas.toDataURL('image/png', 1.0);
-      const link = document.createElement('a');
-      link.href = image;
-      link.download = `Receipt-${receiptNo}.png`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      return new Promise((resolve) => {
+        canvas.toBlob((blob) => resolve(blob), 'image/png');
+      });
     } catch (error) {
-      console.error('Download Error:', error);
-      alert('பதிவிறக்கம் செய்வதில் பிழை!');
-    } finally {
-      setIsGenerating(false);
+      console.error('Blob generation failed:', error);
+      return null;
     }
   };
 
-  // Action 2: Just Open WhatsApp
-  const handleWhatsAppShare = () => {
+  // Modern File Sharing (Navigator Share API)
+  const handleSmartShare = async () => {
+    setIsGenerating(true);
+    const blob = await generateImageBlob();
+    
+    if (blob) {
+      const file = new File([blob], `Receipt-${receiptNo}.png`, { type: 'image/png' });
+      const message = `வணக்கம்! உங்கள் திருவிழா வரி ₹${formData.amount} வெற்றிகரமாக செலுத்தப்பட்டது. \n\nரசீது எண்: ${receiptNo}\nதேதி: ${currentDate}\n\nமிக்க நன்றி! 🙏`;
+
+      // Check if browser supports sharing files
+      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({
+            files: [file],
+            text: message,
+          });
+        } catch (error) {
+          console.log('User cancelled or error:', error);
+          // Fallback to manual WhatsApp link if sharing failed
+          handleManualWhatsAppFallback();
+        }
+      } else {
+        // Fallback for browsers that don't support file sharing
+        handleManualWhatsAppFallback();
+      }
+    }
+    setIsGenerating(false);
+  };
+
+  const handleManualWhatsAppFallback = () => {
+    // 1. Trigger download as backup
+    handleDownloadOnly();
+    
+    // 2. Open WhatsApp link
     if (formData.phoneNumber) {
       const cleanPhone = formData.phoneNumber.replace(/\D/g, '');
       const whatsappPhone = cleanPhone.startsWith('91') ? cleanPhone : `91${cleanPhone}`;
       const message = `வணக்கம்! உங்கள் திருவிழா வரி ₹${formData.amount} வெற்றிகரமாக செலுத்தப்பட்டது. \n\nரசீது எண்: ${receiptNo}\nதேதி: ${currentDate}\n\nமிக்க நன்றி! 🙏`;
       const waUrl = `https://wa.me/${whatsappPhone}?text=${encodeURIComponent(message)}`;
       window.open(waUrl, '_blank');
-    } else {
-      alert('தொலைபேசி எண் கொடுக்கப்படவில்லை!');
+      alert('உங்கள் மொபைல் இந்த நேரடி பகிர்தலை ஆதரிக்கவில்லை. ரசீது பதிவிறக்கம் செய்யப்பட்டுள்ளது, தயவுசெய்து வாட்ஸ்அப்பில் இணைத்து அனுப்பவும்.');
+    }
+  };
+
+  const handleDownloadOnly = async () => {
+    if (!receiptRef.current) return;
+    setIsGenerating(true);
+    try {
+      const blob = await generateImageBlob();
+      if (blob) {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `Receipt-${receiptNo}.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }
+    } catch (error) {
+      alert('பதிவிறக்கம் செய்வதில் பிழை!');
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -136,13 +178,14 @@ const ReceiptPreview = ({ formData, receiptNo, onReset }) => {
       {/* Action Buttons Container */}
       <div className="fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-[#FFFBF0] via-[#FFFBF0] to-transparent pointer-events-none">
         <div className="max-w-lg mx-auto pointer-events-auto space-y-3">
-          {/* WhatsApp Share Button - PRIMARY ACTION */}
+          {/* Smart Share Button */}
           <button 
-            onClick={handleWhatsAppShare}
-            className="w-full flex items-center justify-center gap-4 bg-green-600 text-white py-6 rounded-3xl font-black text-2xl shadow-2xl active:scale-95 transition-all"
+            onClick={handleSmartShare}
+            disabled={isGenerating}
+            className="w-full flex items-center justify-center gap-4 bg-green-600 text-white py-6 rounded-3xl font-black text-2xl shadow-2xl active:scale-95 transition-all disabled:opacity-70"
           >
-            <MessageCircle size={32} />
-            <span>WhatsApp-ல் பகிர்க</span>
+            {isGenerating ? <Loader2 className="animate-spin" size={32} /> : <MessageCircle size={32} />}
+            <span>நேரடியாகப் பகிர்க</span>
           </button>
 
           <div className="grid grid-cols-2 gap-3">
@@ -151,7 +194,7 @@ const ReceiptPreview = ({ formData, receiptNo, onReset }) => {
               disabled={isGenerating}
               className="flex items-center justify-center gap-3 bg-orange-600 text-white py-5 rounded-3xl font-bold text-lg active:scale-95 transition-all disabled:opacity-50"
             >
-              {isGenerating ? <Loader2 className="animate-spin" size={24} /> : <Download size={24} />}
+              <Download size={24} />
               <span>பதிவிறக்குக</span>
             </button>
             <button 
