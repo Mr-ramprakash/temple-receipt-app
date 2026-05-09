@@ -3,6 +3,7 @@ import ReceiptForm from './components/ReceiptForm';
 import ReceiptPreview from './components/ReceiptPreview';
 import { motion, AnimatePresence } from 'framer-motion';
 import { History, User, IndianRupee, Calendar } from 'lucide-react';
+import logo from './assets/logo.webp';
 
 function App() {
   const [showPreview, setShowPreview] = useState(false);
@@ -13,19 +14,31 @@ function App() {
     paymentMethod: 'UPI',
   });
   const [savedReceipts, setSavedReceipts] = useState([]);
+  const [receiptCounter, setReceiptCounter] = useState(1);
+  const [currentReceiptNo, setCurrentReceiptNo] = useState('');
 
+  // Load history and counter from localStorage
   useEffect(() => {
     const history = localStorage.getItem('temple_receipt_history');
-    if (history) {
-      setSavedReceipts(JSON.parse(history));
-    }
+    if (history) setSavedReceipts(JSON.parse(history));
+
+    const counter = localStorage.getItem('temple_receipt_counter');
+    if (counter) setReceiptCounter(parseInt(counter));
   }, []);
+
+  const formatReceiptNo = (num) => {
+    return `KV-${num.toString().padStart(4, '0')}`;
+  };
 
   const handleGenerate = () => {
     if (formData.donorName && formData.amount) {
+      const rNo = formatReceiptNo(receiptCounter);
+      setCurrentReceiptNo(rNo);
+
       const newReceipt = {
         ...formData,
         id: Date.now(),
+        receiptNo: rNo,
         date: new Date().toLocaleDateString('ta-IN', {
           year: 'numeric',
           month: 'short',
@@ -34,12 +47,17 @@ function App() {
         timestamp: new Date().toISOString()
       };
 
+      // Update state and localStorage
       const updatedHistory = [newReceipt, ...savedReceipts].slice(0, 50);
       setSavedReceipts(updatedHistory);
       localStorage.setItem('temple_receipt_history', JSON.stringify(updatedHistory));
 
+      // Increment counter for NEXT receipt
+      const nextCounter = receiptCounter + 1;
+      setReceiptCounter(nextCounter);
+      localStorage.setItem('temple_receipt_counter', nextCounter.toString());
+
       setShowPreview(true);
-      // Scroll to top when switching to preview
       window.scrollTo(0, 0);
     }
   };
@@ -64,22 +82,26 @@ function App() {
       </div>
 
       <div className="relative z-10 max-w-lg mx-auto px-4 py-8 flex flex-col items-center">
-        {/* Header - Compact for mobile */}
+        {/* Header - Logo Only as requested */}
         <motion.div 
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           className="mb-8 text-center"
         >
-          <div className="inline-block p-3 bg-white rounded-2xl shadow-lg border border-orange-50 mb-3">
+          <div className="inline-block p-4 bg-white rounded-[2rem] shadow-xl border border-orange-50 mb-2">
             <img 
-              src="https://img.icons8.com/fluency/96/temple.png" 
-              alt="Temple Icon" 
-              className="w-12 h-12 mx-auto"
+              src={logo} 
+              alt="Temple Logo" 
+              className="w-24 h-24 mx-auto object-contain"
+              onError={(e) => {
+                // Fallback icon if logo fails to load
+                e.target.src = "https://img.icons8.com/fluency/96/horse.png";
+              }}
             />
           </div>
-          <h1 className="text-3xl font-black bg-gradient-to-r from-orange-800 to-amber-700 bg-clip-text text-transparent">
-            கோயில் ரசீது
-          </h1>
+          <p className="text-orange-900/40 font-bold mt-2 tracking-[0.2em] uppercase text-[10px]">
+             Collection App
+          </p>
         </motion.div>
 
         <main className="w-full">
@@ -99,12 +121,12 @@ function App() {
                   onGenerate={handleGenerate} 
                 />
 
-                {/* History Section - More compact for one-screen usage */}
+                {/* History Section */}
                 {savedReceipts.length > 0 && (
                   <div className="w-full max-w-md mx-auto mt-12 pb-32">
                     <div className="flex items-center gap-2 mb-4 px-2">
                       <History size={18} className="text-orange-600" />
-                      <h3 className="font-bold text-orange-900 uppercase tracking-wider text-xs">சமீபத்திய வரவுகள்</h3>
+                      <h3 className="font-bold text-orange-900 uppercase tracking-wider text-xs">சமீபத்திய ரசீதுகள்</h3>
                     </div>
                     <div className="grid grid-cols-1 gap-2">
                       {savedReceipts.slice(0, 3).map((receipt) => (
@@ -118,7 +140,7 @@ function App() {
                             </div>
                             <div>
                               <p className="font-bold text-gray-800 text-sm leading-tight">{receipt.donorName}</p>
-                              <p className="text-[10px] text-gray-400 font-medium uppercase">{receipt.date}</p>
+                              <p className="text-[10px] text-gray-400 font-medium uppercase">{receipt.receiptNo} • {receipt.date}</p>
                             </div>
                           </div>
                           <div className="text-right">
@@ -143,6 +165,7 @@ function App() {
               >
                 <ReceiptPreview 
                   formData={formData} 
+                  receiptNo={currentReceiptNo}
                   onReset={handleReset} 
                 />
               </motion.div>
@@ -150,11 +173,10 @@ function App() {
           </AnimatePresence>
         </main>
 
-        {/* Footer - Only visible if not previewing or at the very bottom */}
         {!showPreview && (
           <footer className="mt-8 mb-4 text-center">
             <p className="text-orange-900/30 text-[10px] font-bold tracking-widest uppercase">
-              © 2026 கோயில் நிர்வாகம்
+              © 2026 நிர்வாகம்
             </p>
           </footer>
         )}
